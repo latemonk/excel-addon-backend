@@ -101,6 +101,12 @@ For chart operation:
 - For specific range like "A1:B10", use: { "range": "A1:B10" }
 - Example: { "chartType": "bar", "range": "A1:B10", "title": "데이터 차트" }
 
+For translate operation:
+- If user mentions column by letter (e.g., "C열을 영어로 번역"), use: { "sourceRange": "C:C", "targetLanguage": "영어" }
+- If user specifies target column (e.g., "F열에 추가"), use: { "targetRange": "F:F" }
+- Languages: 영어 (English), 한국어 (Korean), 일본어 (Japanese), 중국어 (Chinese), etc.
+- Example: { "sourceRange": "C:C", "targetRange": "F:F", "targetLanguage": "영어" }
+
 Return JSON in format:
 {
   "operation": "operation_name",
