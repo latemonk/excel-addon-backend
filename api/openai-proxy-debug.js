@@ -73,6 +73,12 @@ For sum operation:
 - For specific range sum, use: { "sourceRange": "A2:A10" }
 - For adding sum below selection, use: { "addNewRow": true }
 
+For format operation:
+- If user mentions number format (e.g., "숫자 형식", "숫자로"), return: { "numberFormat": "number" }
+- If user mentions currency/won format (e.g., "원화 형식", "통화 형식"), return: { "numberFormat": "currency" }
+- For specific cells like "E101", use: { "range": "E101" }
+- Other format options: bold, italic, fontSize, fontColor, backgroundColor
+
 Return JSON in format:
 {
   "operation": "operation_name",
