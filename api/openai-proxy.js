@@ -44,6 +44,17 @@ export default async function handler(req, res) {
     return;
   }
   
+  // Handle GET request for health check (no origin check needed)
+  if (req.method === 'GET') {
+    res.status(200).json({ 
+      status: 'ok',
+      message: 'Excel Addon Proxy API is running',
+      apiKeyConfigured: !!OPENAI_API_KEY,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
   // For other requests, check origin
   if (isOriginAllowed(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
@@ -53,16 +64,6 @@ export default async function handler(req, res) {
     console.log('Origin not allowed:', origin);
     console.log('Allowed origins:', ALLOWED_ORIGINS);
     res.status(403).json({ error: 'Origin not allowed: ' + origin });
-    return;
-  }
-
-  // Handle GET request for health check
-  if (req.method === 'GET') {
-    res.status(200).json({ 
-      status: 'ok',
-      message: 'Excel Addon Proxy API is running',
-      apiKeyConfigured: !!OPENAI_API_KEY
-    });
     return;
   }
 
