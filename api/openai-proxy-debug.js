@@ -82,6 +82,19 @@ For format operation:
 - Other format options: bold (굵게), italic (기울임), fontSize (글자 크기)
 - Common colors: 파란색=#0000FF, 빨간색=#FF0000, 초록색=#00FF00, 노란색=#FFFF00, 검정색=#000000
 
+For sort operation:
+- If user mentions column by letter (e.g., "B열"), extract column number (B=2, C=3, etc.)
+- If user mentions "내림차순" or "큰 순서대로", use: { "ascending": false }
+- If user mentions "오름차순" or "작은 순서대로", use: { "ascending": true }
+- Default is ascending if not specified
+- Parameters: { "column": 2, "ascending": false }
+
+For conditional_format operation:
+- If user mentions numeric comparison (e.g., "100보다 큰", "50 미만"), it will only apply to numeric cells
+- Conditions: "greater_than" (크다, 초과), "less_than" (작다, 미만), "equal_to" (같다)
+- Colors: use hex values like "#00FF00" for green (녹색), "#FF0000" for red (빨간색)
+- Example: { "condition": "greater_than", "value": 100, "backgroundColor": "#00FF00" }
+
 Return JSON in format:
 {
   "operation": "operation_name",
