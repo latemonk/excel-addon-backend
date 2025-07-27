@@ -2,13 +2,40 @@
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || ['https://localhost:3000', 'https://excel.office.com'];
 
+// CORS validation function
+function isOriginAllowed(origin) {
+  if (!origin) return false;
+  
+  // Check exact matches
+  if (ALLOWED_ORIGINS.includes(origin)) return true;
+  
+  // Check wildcard
+  if (ALLOWED_ORIGINS.includes('*')) return true;
+  
+  // Check patterns (e.g., for Office domains)
+  const officePatterns = [
+    /^https:\/\/.*\.office\.com$/,
+    /^https:\/\/.*\.office365\.com$/,
+    /^https:\/\/.*\.microsoft\.com$/,
+    /^https:\/\/localhost:\d+$/
+  ];
+  
+  return officePatterns.some(pattern => pattern.test(origin));
+}
+
 export default async function handler(req, res) {
   // CORS headers
   const origin = req.headers.origin;
-  if (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*')) {
-    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  if (isOriginAllowed(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  } else {
+    // Reject requests from unauthorized origins
+    if (req.method !== 'OPTIONS') {
+      res.status(403).json({ error: 'Origin not allowed' });
+      return;
+    }
   }
 
   // Handle OPTIONS request
