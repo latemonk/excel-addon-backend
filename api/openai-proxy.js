@@ -288,6 +288,15 @@ async function translateBatch(context) {
       })
     });
 
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('OpenAI translation error:', error);
+      return {
+        success: false,
+        error: `Translation API error: ${error.error?.message || 'Unknown error'}`
+      };
+    }
+    
     const data = await response.json();
     
     if (data.choices && data.choices[0]) {
@@ -315,6 +324,12 @@ async function translateBatch(context) {
           operation: 'translate_batch_result',
           translations: translations
         }
+      };
+    } else {
+      console.error('Invalid OpenAI response:', data);
+      return {
+        success: false,
+        error: 'Invalid response from translation API'
       };
     }
   } catch (error) {
