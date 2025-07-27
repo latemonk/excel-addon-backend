@@ -56,7 +56,17 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Only allow POST
+  // Handle GET request for health check
+  if (req.method === 'GET') {
+    res.status(200).json({ 
+      status: 'ok',
+      message: 'Excel Addon Proxy API is running',
+      apiKeyConfigured: !!OPENAI_API_KEY
+    });
+    return;
+  }
+
+  // Only allow POST for actual API calls
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
@@ -126,7 +136,7 @@ For conditional_format operation:
 Current sheet context:
 - Active range: ${sheetContext.activeRange?.address}
 - Sheet dimensions: ${sheetContext.lastRow} rows x ${sheetContext.lastColumn} columns
-- Headers: ${sheetContext.headers?.map(h => \`Column \${h.columnLetter}: "\${h.label}"\`).join(', ')}
+- Headers: ${sheetContext.headers?.map(h => `Column ${h.columnLetter}: "${h.label}"`).join(', ')}
 
 Return JSON in this format:
 {
