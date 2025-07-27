@@ -1,6 +1,6 @@
 // Vercel Serverless Function
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || ['https://localhost:3000', 'https://excel.office.com'];
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || ['https://localhost:3000', 'https://excel.office.com', 'https://excel-addon-backend.vercel.app'];
 
 // CORS validation function
 function isOriginAllowed(origin) {
