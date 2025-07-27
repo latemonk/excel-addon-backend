@@ -59,6 +59,13 @@ export default async function handler(req, res) {
     console.log('Command:', command);
     console.log('Context:', JSON.stringify(sheetContext, null, 2));
     
+    // Special handling for batch translation
+    if (sheetContext.operation === 'translate_batch') {
+      const result = await translateBatch(sheetContext);
+      res.status(200).json(result);
+      return;
+    }
+    
     // OpenAI API 호출
     const systemPrompt = `You are an Excel automation assistant. Analyze the command and return JSON with the operation to perform.
 Available operations: merge, sum, average, count, format, sort, filter, insert, delete, formula, chart, conditional_format, translate
@@ -153,5 +160,92 @@ Return JSON in format:
       success: false,
       error: error.message
     });
+  }
+}
+
+// Handle batch translation
+async function translateBatch(context) {
+  const { texts, targetLanguage, sourceLanguage } = context;
+  
+  const numberedTexts = texts.map((text, index) => `[${index + 1}] ${text}`);
+  
+  const systemPrompt = `You are a professional translator for spreadsheet data. CRITICAL RULES:
+1. Each numbered item MUST be translated separately
+2. Return translations in EXACT same format: [1] translation1\\n[2] translation2\\n...
+3. If an item is empty or untranslatable, return [N] [EMPTY] for that number
+4. Maintain the exact count of items`;
+
+  const userPrompt = sourceLanguage 
+    ? `Translate these ${texts.length} items from ${sourceLanguage} to ${targetLanguage}:\\n\\n${numberedTexts.join('\\n')}`
+    : `Translate these ${texts.length} items to ${targetLanguage}:\\n\\n${numberedTexts.join('\\n')}`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.3,
+        max_tokens: 2000
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('OpenAI translation error:', error);
+      return {
+        success: false,
+        error: `Translation API error: ${error.error?.message || 'Unknown error'}`
+      };
+    }
+    
+    const data = await response.json();
+    
+    if (data.choices && data.choices[0]) {
+      const responseText = data.choices[0].message.content.trim();
+      const translations = [];
+      const lines = responseText.split('\\n');
+      
+      const translationMap = {};
+      for (const line of lines) {
+        const match = line.match(/^\\[(\\d+)\\]\\s*(.*)$/);
+        if (match) {
+          const num = parseInt(match[1]);
+          const translation = match[2].trim();
+          translationMap[num] = translation === '[EMPTY]' ? '' : translation;
+        }
+      }
+      
+      for (let i = 1; i <= texts.length; i++) {
+        translations.push(translationMap[i] || '');
+      }
+      
+      return {
+        success: true,
+        data: {
+          operation: 'translate_batch_result',
+          translations: translations
+        }
+      };
+    } else {
+      console.error('Invalid OpenAI response:', data);
+      return {
+        success: false,
+        error: 'Invalid response from translation API'
+      };
+    }
+  } catch (error) {
+    console.error('Translation error:', error);
+    return {
+      success: false,
+      error: '번역 중 오류가 발생했습니다.'
+    };
   }
 }
