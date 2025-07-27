@@ -22,6 +22,8 @@ function isOriginAllowed(origin) {
     /^https:\/\/.*\.office\.com$/,
     /^https:\/\/.*\.office365\.com$/,
     /^https:\/\/.*\.microsoft\.com$/,
+    /^https:\/\/.*\.officeapps\.live\.com$/,
+    /^https:\/\/.*\.sharepoint\.com$/,
     /^https:\/\/localhost:\d+$/
   ];
   
@@ -56,6 +58,10 @@ export default async function handler(req, res) {
   }
 
   // For other requests, check origin
+  console.log('Request method:', req.method);
+  console.log('Request origin:', origin);
+  console.log('User-Agent:', req.headers['user-agent']);
+  
   if (isOriginAllowed(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -63,7 +69,12 @@ export default async function handler(req, res) {
   } else {
     console.log('Origin not allowed:', origin);
     console.log('Allowed origins:', ALLOWED_ORIGINS);
-    res.status(403).json({ error: 'Origin not allowed: ' + origin });
+    res.status(403).json({ 
+      error: 'Origin not allowed',
+      origin: origin,
+      allowedOrigins: ALLOWED_ORIGINS,
+      headers: req.headers
+    });
     return;
   }
 
