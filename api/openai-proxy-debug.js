@@ -66,6 +66,12 @@ Available operations: merge, sum, average, count, format, sort, filter, insert, 
 Current context:
 - Active range: ${sheetContext.activeRange?.address}
 - Sheet: ${sheetContext.sheetName}
+- Headers: ${sheetContext.headers?.map(h => `Column ${h.columnLetter}: "${h.label}"`).join(', ') || 'No headers'}
+
+For sum operation:
+- If user mentions a column by header name (e.g., "totalToken 열의 합", "totalToken 합산"), return: { "sumType": "column", "columnName": "totalToken" }
+- For specific range sum, use: { "sourceRange": "A2:A10" }
+- For adding sum below selection, use: { "addNewRow": true }
 
 Return JSON in format:
 {

@@ -117,7 +117,7 @@ export default async function handler(req, res) {
     
 Available operations:
 1. merge: Merge cells
-2. sum: Sum values in a range
+2. sum: Sum values in a range or column
 3. average: Calculate average
 4. count: Count cells (can count all, numbers only, or based on conditions)
 5. format: Format cells (bold, italic, font color, background color, etc.)
@@ -137,6 +137,11 @@ For count operation, parameters should include:
 - "countType": "count", "counta", or "countif"
 - "condition": for countif
 - "operator": "contains", "equals", ">", "<", etc.
+
+For sum operation:
+- If user mentions a column by header name (e.g., "totalToken 열의 합", "totalToken 합산"), return: { "sumType": "column", "columnName": "totalToken" }
+- For specific range sum, use: { "sourceRange": "A2:A10" }
+- For adding sum below selection, use: { "addNewRow": true }
 
 For conditional_format operation:
 - "condition": "greater_than", "less_than", "equal_to", "text_contains", "not_empty", "empty"
