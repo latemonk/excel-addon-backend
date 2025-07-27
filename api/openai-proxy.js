@@ -1,6 +1,11 @@
 // Vercel Serverless Function
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',') || ['https://localhost:3000', 'https://excel.office.com', 'https://excel-addon-backend.vercel.app'];
+// 환경 변수가 없을 때 기본값에 GitHub Pages URL 포함
+const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',').map(origin => origin.trim()) || [
+  'https://localhost:3000',
+  'https://excel.office.com',
+  'https://latemonk.github.io'
+];
 
 // CORS validation function
 function isOriginAllowed(origin) {
@@ -26,27 +31,44 @@ function isOriginAllowed(origin) {
 export default async function handler(req, res) {
   // CORS headers
   const origin = req.headers.origin;
+  
+  // Handle OPTIONS request first (preflight)
+  if (req.method === 'OPTIONS') {
+    if (isOriginAllowed(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+      res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+    }
+    res.status(200).end();
+    return;
+  }
+  
+  // For other requests, check origin
   if (isOriginAllowed(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   } else {
-    // Reject requests from unauthorized origins
-    if (req.method !== 'OPTIONS') {
-      res.status(403).json({ error: 'Origin not allowed' });
-      return;
-    }
-  }
-
-  // Handle OPTIONS request
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
+    console.log('Origin not allowed:', origin);
+    console.log('Allowed origins:', ALLOWED_ORIGINS);
+    res.status(403).json({ error: 'Origin not allowed: ' + origin });
     return;
   }
 
   // Only allow POST
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  // Check if API key is configured
+  if (!OPENAI_API_KEY) {
+    console.error('OPENAI_API_KEY is not configured');
+    res.status(500).json({
+      success: false,
+      error: 'API 키가 설정되지 않았습니다. 서버 설정을 확인해주세요.'
+    });
     return;
   }
 
