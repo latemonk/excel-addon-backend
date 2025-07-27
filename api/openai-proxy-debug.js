@@ -95,6 +95,12 @@ For conditional_format operation:
 - Colors: use hex values like "#00FF00" for green (녹색), "#FF0000" for red (빨간색)
 - Example: { "condition": "greater_than", "value": 100, "backgroundColor": "#00FF00" }
 
+For chart operation:
+- If user mentions chart/graph (e.g., "차트", "그래프", "막대 차트"), use: { "chartType": "bar" }
+- Chart types: "bar" (막대), "line" (선), "pie" (원), "scatter" (분산형)
+- For specific range like "A1:B10", use: { "range": "A1:B10" }
+- Example: { "chartType": "bar", "range": "A1:B10", "title": "데이터 차트" }
+
 Return JSON in format:
 {
   "operation": "operation_name",
