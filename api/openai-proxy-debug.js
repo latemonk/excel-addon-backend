@@ -77,7 +77,10 @@ For format operation:
 - If user mentions number format (e.g., "숫자 형식", "숫자로"), return: { "numberFormat": "number" }
 - If user mentions currency/won format (e.g., "원화 형식", "통화 형식"), return: { "numberFormat": "currency" }
 - For specific cells like "E101", use: { "range": "E101" }
-- Other format options: bold, italic, fontSize, fontColor, backgroundColor
+- If user mentions text color (e.g., "파란색으로", "빨간색 글자"), use: { "fontColor": "#0000FF" } (not backgroundColor)
+- If user mentions background/cell color (e.g., "배경색", "셀 색상"), use: { "backgroundColor": "#color" }
+- Other format options: bold (굵게), italic (기울임), fontSize (글자 크기)
+- Common colors: 파란색=#0000FF, 빨간색=#FF0000, 초록색=#00FF00, 노란색=#FFFF00, 검정색=#000000
 
 Return JSON in format:
 {
