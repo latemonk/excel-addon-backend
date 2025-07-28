@@ -130,6 +130,7 @@ Available operations:
 12. conditional_format: Add conditional formatting
 13. translate: Translate cell contents to another language
 14. compress: Remove empty rows in a specific column range
+15. remove_border: Remove cell borders
 
 For count operation, parameters should include:
 - "sourceRange": range to count from
@@ -142,6 +143,13 @@ For sum operation:
 - If user mentions a column by header name (e.g., "totalToken 열의 합", "totalToken 합산"), return: { "sumType": "column", "columnName": "totalToken" }
 - For specific range sum, use: { "sourceRange": "A2:A10" }
 - For adding sum below selection, use: { "addNewRow": true }
+
+For average operation:
+- If user mentions column average (e.g., "C열 평균"), return: { "averageType": "column", "column": "C" }
+- If user mentions row average (e.g., "3행 평균"), return: { "averageType": "row", "row": 3 }
+- If user mentions range average (e.g., "C1-C100 평균", "C1:C100 평균"), return: { "sourceRange": "C1:C100" }
+- If user mentions column by header name (e.g., "총액 평균"), return: { "averageType": "column", "columnName": "총액" }
+- Default behavior without specific range uses selected cells
 
 For format operation:
 - If user mentions number format (e.g., "숫자 형식", "숫자로"), return: { "numberFormat": "number" }
@@ -176,6 +184,12 @@ For translate operation:
 - If user specifies target column (e.g., "F열에 추가"), use: { "targetRange": "F:F" }
 - Languages: 영어 (English), 한국어 (Korean), 일본어 (Japanese), 중국어 (Chinese), etc.
 - Example: { "sourceRange": "C:C", "targetRange": "F:F", "targetLanguage": "영어" }
+
+For remove_border operation:
+- If user mentions removing border (e.g., "테두리 없애", "border 제거"), use: { "borderType": "all" }
+- Border types: "all" (모든 테두리), "right" (오른쪽), "left" (왼쪽), "top" (위), "bottom" (아래)
+- If user specifies column (e.g., "C열의 오른쪽 테두리"), use: { "range": "C:C", "borderType": "right" }
+- Example: { "range": "C:C", "borderType": "right" }
 
 Current sheet context:
 - Active range: ${sheetContext.activeRange?.address}
@@ -260,15 +274,36 @@ async function translateBatch(context) {
   
   const numberedTexts = texts.map((text, index) => `[${index + 1}] ${text}`);
   
-  const systemPrompt = `You are a professional translator for spreadsheet data. CRITICAL RULES:
-1. Each numbered item MUST be translated separately
-2. Return translations in EXACT same format: [1] translation1\n[2] translation2\n...
-3. If an item is empty or untranslatable, return [N] [EMPTY] for that number
-4. Maintain the exact count of items`;
+  // Map target languages to their specific language codes for clarity
+  const languageMap = {
+    '영어': 'English',
+    '일본어': 'Japanese', 
+    '중국어': 'Chinese',
+    '한국어': 'Korean',
+    '스페인어': 'Spanish',
+    '프랑스어': 'French',
+    '독일어': 'German'
+  };
+  
+  const targetLangCode = languageMap[targetLanguage] || targetLanguage;
+  const sourceLangCode = sourceLanguage ? (languageMap[sourceLanguage] || sourceLanguage) : 'auto-detect';
+  
+  const systemPrompt = `You are a professional translator for spreadsheet data. Your task is to translate text ONLY to ${targetLangCode}.
+
+CRITICAL RULES:
+1. ALWAYS translate ALL items to ${targetLangCode} ONLY - never use any other language
+2. Each numbered item MUST be translated separately to ${targetLangCode}
+3. Return translations in EXACT format: [1] ${targetLangCode}_translation\n[2] ${targetLangCode}_translation\n...
+4. If an item is empty or untranslatable, return [N] [EMPTY] for that number
+5. NEVER translate to Korean unless ${targetLangCode} is specifically Korean
+6. NEVER keep the original language - always translate to ${targetLangCode}
+7. You MUST return EXACTLY ${texts.length} numbered translations - no more, no less
+8. NEVER skip numbers - if you receive [1] through [20], you MUST return [1] through [20]
+9. Each batch is independent - maintain ${targetLangCode} consistency throughout ALL items`;
 
   const userPrompt = sourceLanguage 
-    ? `Translate these ${texts.length} items from ${sourceLanguage} to ${targetLanguage}:\n\n${numberedTexts.join('\n')}`
-    : `Translate these ${texts.length} items to ${targetLanguage}:\n\n${numberedTexts.join('\n')}`;
+    ? `Translate ALL of these ${texts.length} items from ${sourceLangCode} to ${targetLangCode} (IMPORTANT: Every single item must be in ${targetLangCode}, not ${sourceLangCode} or any other language):\n\n${numberedTexts.join('\n')}`
+    : `Translate ALL of these ${texts.length} items to ${targetLangCode} (IMPORTANT: Every single item must be in ${targetLangCode}, not the original language or Korean):\n\n${numberedTexts.join('\n')}`;
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -314,8 +349,15 @@ async function translateBatch(context) {
         }
       }
       
+      // Ensure we have exactly the same number of translations as input texts
       for (let i = 1; i <= texts.length; i++) {
-        translations.push(translationMap[i] || '');
+        if (translationMap.hasOwnProperty(i)) {
+          translations.push(translationMap[i]);
+        } else {
+          // If translation is missing, mark as empty to maintain row alignment
+          console.log(`Warning: Missing translation for item ${i}`);
+          translations.push('');
+        }
       }
       
       return {
