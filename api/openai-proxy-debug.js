@@ -171,13 +171,13 @@ async function translateBatch(context) {
   
   const systemPrompt = `You are a professional translator for spreadsheet data. CRITICAL RULES:
 1. Each numbered item MUST be translated separately
-2. Return translations in EXACT same format: [1] translation1\\n[2] translation2\\n...
+2. Return translations in EXACT same format: [1] translation1\n[2] translation2\n...
 3. If an item is empty or untranslatable, return [N] [EMPTY] for that number
 4. Maintain the exact count of items`;
 
   const userPrompt = sourceLanguage 
-    ? `Translate these ${texts.length} items from ${sourceLanguage} to ${targetLanguage}:\\n\\n${numberedTexts.join('\\n')}`
-    : `Translate these ${texts.length} items to ${targetLanguage}:\\n\\n${numberedTexts.join('\\n')}`;
+    ? `Translate these ${texts.length} items from ${sourceLanguage} to ${targetLanguage}:\n\n${numberedTexts.join('\n')}`
+    : `Translate these ${texts.length} items to ${targetLanguage}:\n\n${numberedTexts.join('\n')}`;
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -211,7 +211,7 @@ async function translateBatch(context) {
     if (data.choices && data.choices[0]) {
       const responseText = data.choices[0].message.content.trim();
       const translations = [];
-      const lines = responseText.split('\\n');
+      const lines = responseText.split('\n');
       
       const translationMap = {};
       for (const line of lines) {
