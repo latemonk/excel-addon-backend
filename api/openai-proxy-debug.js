@@ -117,15 +117,19 @@ For chart operation:
 
 For translate operation:
 - If user mentions column by letter (e.g., "C열을 영어로 번역"), use: { "sourceRange": "C:C", "targetLanguage": "영어" }
-- If user specifies target column (e.g., "F열에 추가"), use: { "targetRange": "F:F" }
+- If user mentions specific range (e.g., "B2-B40", "B2:B40"), use: { "sourceRange": "B2:B40", "targetLanguage": "일본어" }
+- If user specifies target column (e.g., "E열에 추가", "E열에 넣어"), use: { "targetRange": "E:E" }
+- IMPORTANT: Target column must be extracted from phrases like "E열에", "E column", "to column E"
 - Languages: 영어 (English), 한국어 (Korean), 일본어 (Japanese), 중국어 (Chinese), etc.
-- Example: { "sourceRange": "C:C", "targetRange": "F:F", "targetLanguage": "영어" }
+- Example: { "sourceRange": "B2:B40", "targetRange": "E:E", "targetLanguage": "일본어" }
 
 For remove_border operation:
 - If user mentions removing border (e.g., "테두리 없애", "border 제거"), use: { "borderType": "all" }
 - Border types: "all" (모든 테두리), "right" (오른쪽), "left" (왼쪽), "top" (위), "bottom" (아래)
-- If user specifies column (e.g., "C열의 오른쪽 테두리"), use: { "range": "C:C", "borderType": "right" }
-- Example: { "range": "C:C", "borderType": "right" }
+- If user specifies a specific column (e.g., "C열의 오른쪽 테두리"), use: { "range": "C:C", "borderType": "right" }
+- If user says "모든 셀", "전체 시트", "시트 전체", "모든 열", "모든 행", use: { "range": "all", "borderType": "all" }
+- If user says "선택한" or "지정한" (e.g., "선택한 셀", "지정한 열", "선택한 범위", "지정한 행"), don't include range parameter (uses selected range)
+- Example: { "range": "C:C", "borderType": "right" } or { "range": "all", "borderType": "all" }
 
 Return JSON in format:
 {
@@ -207,7 +211,9 @@ CRITICAL RULES:
 6. NEVER keep the original language - always translate to ${targetLangCode}
 7. You MUST return EXACTLY ${texts.length} numbered translations - no more, no less
 8. NEVER skip numbers - if you receive [1] through [20], you MUST return [1] through [20]
-9. Each batch is independent - maintain ${targetLangCode} consistency throughout ALL items`;
+9. Each batch is independent - maintain ${targetLangCode} consistency throughout ALL items
+10. IMPORTANT: If source is Korean and target is Japanese, you MUST translate Korean text to Japanese
+11. DO NOT return the original Korean text - it must be translated to ${targetLangCode}`;
 
   const userPrompt = sourceLanguage 
     ? `Translate ALL of these ${texts.length} items from ${sourceLangCode} to ${targetLangCode} (IMPORTANT: Every single item must be in ${targetLangCode}, not ${sourceLangCode} or any other language):\n\n${numberedTexts.join('\n')}`
