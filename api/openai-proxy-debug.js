@@ -210,16 +210,24 @@ async function translateBatch(context) {
     
     if (data.choices && data.choices[0]) {
       const responseText = data.choices[0].message.content.trim();
+      console.log('Raw OpenAI response:', responseText);
+      console.log('Response length:', responseText.length);
+      
       const translations = [];
       const lines = responseText.split('\n');
+      console.log('Number of lines:', lines.length);
+      console.log('First 5 lines:', lines.slice(0, 5));
       
       const translationMap = {};
       for (const line of lines) {
-        const match = line.match(/^\\[(\\d+)\\]\\s*(.*)$/);
+        const match = line.match(/^\[(\d+)\]\s*(.*)$/);
         if (match) {
           const num = parseInt(match[1]);
           const translation = match[2].trim();
           translationMap[num] = translation === '[EMPTY]' ? '' : translation;
+          console.log(`Parsed [${num}]: "${translation}"`);
+        } else if (line.trim()) {
+          console.log('Line did not match pattern:', line);
         }
       }
       

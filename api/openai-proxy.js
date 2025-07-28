@@ -306,7 +306,7 @@ async function translateBatch(context) {
       
       const translationMap = {};
       for (const line of lines) {
-        const match = line.match(/^\\[(\\d+)\\]\\s*(.*)$/);
+        const match = line.match(/^\[(\d+)\]\s*(.*)$/);
         if (match) {
           const num = parseInt(match[1]);
           const translation = match[2].trim();
