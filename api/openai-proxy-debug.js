@@ -114,7 +114,9 @@ For chart operation:
 - If user mentions chart/graph (e.g., "차트", "그래프", "막대 차트"), use: { "chartType": "bar" }
 - Chart types: "bar" (막대), "line" (선), "pie" (원), "scatter" (분산형)
 - For specific range like "A1:B10", use: { "range": "A1:B10" }
-- Example: { "chartType": "bar", "range": "A1:B10", "title": "데이터 차트" }
+- IMPORTANT: If active range shows multiple non-contiguous cells (e.g., "B2,C10,D12"), the chart will consolidate the data automatically
+- For individual cells, the system will create a temporary consolidated range
+- Example: { "chartType": "bar", "title": "데이터 차트" }
 
 For translate operation:
 - If user mentions column by letter (e.g., "C열을 영어로 번역"), use: { "sourceRange": "C:C", "targetLanguage": "영어" }
