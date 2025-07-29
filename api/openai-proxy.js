@@ -170,16 +170,23 @@ For sort operation:
 - Parameters: { "column": 2, "ascending": false }
 
 For conditional_format operation:
-- If user mentions numeric comparison (e.g., "100보다 큰", "50 미만"), it will only apply to numeric cells
+- IMPORTANT: Do NOT include "range" parameter unless user specifically mentions a range
+- If user just says "값이 X보다 큰 셀" without specifying range, do NOT add range parameter
+- If user mentions numeric comparison (e.g., "100보다 큰", "50 미만"), it will apply to all cells in the sheet
 - Conditions: "greater_than" (크다, 초과), "less_than" (작다, 미만), "equal_to" (같다)
 - Colors: use hex values like "#00FF00" for green (녹색), "#FF0000" for red (빨간색)
-- Example: { "condition": "greater_than", "value": 100, "backgroundColor": "#00FF00" }
+- Example (NO range): { "condition": "greater_than", "value": 100, "backgroundColor": "#00FF00" }
+- Only add range if user says something like "A열에서", "선택한 범위에서", etc.
 
 For chart operation:
-- If user mentions chart/graph (e.g., "차트", "그래프", "막대 차트"), use: { "chartType": "bar" }
-- Chart types: "bar" (막대), "line" (선), "pie" (원), "scatter" (분산형)
+- IMPORTANT: If user just says "차트" or "그래프" without specifying type, ALWAYS use: { "chartType": "bar" }
+- If user mentions specific chart type (e.g., "막대 차트", "선 그래프"), use the specified type
+- Chart types: "bar" (막대, DEFAULT), "line" (선), "pie" (원), "scatter" (분산형)
 - For specific range like "A1:B10", use: { "range": "A1:B10" }
-- Example: { "chartType": "bar", "range": "A1:B10", "title": "데이터 차트" }
+- If active range shows multiple non-contiguous cells (e.g., "B2,C10,D12"), the chart will consolidate the data automatically
+- For individual cells, the system will create a temporary consolidated range
+- Example: { "chartType": "bar", "title": "데이터 차트" }
+- ALWAYS include chartType parameter, default to "bar" if not specified
 
 For translate operation:
 - If user mentions column by letter (e.g., "C열을 영어로 번역"), use: { "sourceRange": "C:C", "targetLanguage": "영어" }
