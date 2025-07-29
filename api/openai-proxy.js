@@ -141,6 +141,7 @@ For count operation, parameters should include:
 
 For sum operation:
 - If user mentions a column by header name (e.g., "totalToken 열의 합", "totalToken 합산"), return: { "sumType": "column", "columnName": "totalToken" }
+- If user mentions a column by letter (e.g., "D열 합계", "D column sum"), return: { "sumType": "column", "columnName": "D" }
 - For specific range sum, use: { "sourceRange": "A2:A10" }
 - For adding sum below selection, use: { "addNewRow": true }
 
@@ -187,6 +188,11 @@ For translate operation:
 - Languages: 영어 (English), 한국어 (Korean), 일본어 (Japanese), 중국어 (Chinese), etc.
 - Example: { "sourceRange": "B2:B40", "targetRange": "E:E", "targetLanguage": "일본어" }
 
+For compress operation:
+- If user mentions removing empty rows in a range (e.g., "D2:D170 사이의 빈 행 제거"), use: { "range": "D2:D170" }
+- This removes entire rows where the specified column cells are empty
+- Example: { "range": "D2:D170" }
+
 For remove_border operation:
 - If user mentions removing border (e.g., "테두리 없애", "border 제거"), use: { "borderType": "all" }
 - Border types: "all" (모든 테두리), "right" (오른쪽), "left" (왼쪽), "top" (위), "bottom" (아래)
@@ -200,7 +206,22 @@ Current sheet context:
 - Sheet dimensions: ${sheetContext.lastRow} rows x ${sheetContext.lastColumn} columns
 - Headers: ${sheetContext.headers?.map(h => `Column ${h.columnLetter}: "${h.label}"`).join(', ')}
 
-Return JSON in this format:
+IMPORTANT: If user requests multiple operations in one command (e.g., "format column A as number and column B as currency"), 
+return an array of operations in this format:
+{
+  "operations": [
+    {
+      "operation": "format",
+      "parameters": { "columnName": "totalTokens", "numberFormat": "number" }
+    },
+    {
+      "operation": "format", 
+      "parameters": { "columnName": "totalCharge", "numberFormat": "currency" }
+    }
+  ]
+}
+
+For single operations, return:
 {
   "operation": "operation_name",
   "parameters": {
