@@ -68,7 +68,7 @@ export default async function handler(req, res) {
     
     // OpenAI API 호출
     const systemPrompt = `You are an Excel automation assistant. Analyze the command and return JSON with the operation to perform.
-Available operations: merge, sum, average, count, format, sort, filter, insert, delete, formula, chart, conditional_format, translate, remove_border
+Available operations: merge, sum, average, count, format, sort, filter, insert, delete, formula, chart, conditional_format, translate, remove_border, border_format
 
 Current context:
 - Active range: ${sheetContext.activeRange?.address}
@@ -136,6 +136,14 @@ For remove_border operation:
 - If user says "모든 셀", "전체 시트", "시트 전체", "모든 열", "모든 행", use: { "range": "all", "borderType": "all" }
 - If user says "선택한" or "지정한" (e.g., "선택한 셀", "지정한 열", "선택한 범위", "지정한 행"), don't include range parameter (uses selected range)
 - Example: { "range": "C:C", "borderType": "right" } or { "range": "all", "borderType": "all" }
+
+For border_format operation:
+- If user mentions changing border color (e.g., "테두리 빨간색으로", "border 파란색"), use border_format operation
+- Border types: "all" (모든 테두리), "right" (오른쪽), "left" (왼쪽), "top" (위), "bottom" (아래), "inside" (내부)
+- Colors: "빨간색"="#FF0000", "파란색"="#0000FF", "검정색"="#000000", "초록색"="#00FF00", "노란색"="#FFFF00"
+- Border styles: "continuous" (실선, default), "dash" (점선), "dashDot" (일점쇄선), "double" (이중선)
+- Example: { "borderType": "all", "color": "#FF0000", "style": "continuous" }
+- If user says "선택한" or row/range is mentioned, don't include range parameter (uses selected range)
 
 IMPORTANT: If user requests multiple operations in one command (e.g., "format column A as number and column B as currency"), 
 return an array of operations in this format:
