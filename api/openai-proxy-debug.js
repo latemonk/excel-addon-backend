@@ -111,12 +111,14 @@ For conditional_format operation:
 - Example: { "condition": "greater_than", "value": 100, "backgroundColor": "#00FF00" }
 
 For chart operation:
-- If user mentions chart/graph (e.g., "차트", "그래프", "막대 차트"), use: { "chartType": "bar" }
-- Chart types: "bar" (막대), "line" (선), "pie" (원), "scatter" (분산형)
+- IMPORTANT: If user just says "차트" or "그래프" without specifying type, ALWAYS use: { "chartType": "bar" }
+- If user mentions specific chart type (e.g., "막대 차트", "선 그래프"), use the specified type
+- Chart types: "bar" (막대, DEFAULT), "line" (선), "pie" (원), "scatter" (분산형)
 - For specific range like "A1:B10", use: { "range": "A1:B10" }
-- IMPORTANT: If active range shows multiple non-contiguous cells (e.g., "B2,C10,D12"), the chart will consolidate the data automatically
+- If active range shows multiple non-contiguous cells (e.g., "B2,C10,D12"), the chart will consolidate the data automatically
 - For individual cells, the system will create a temporary consolidated range
 - Example: { "chartType": "bar", "title": "데이터 차트" }
+- ALWAYS include chartType parameter, default to "bar" if not specified
 
 For translate operation:
 - If user mentions column by letter (e.g., "C열을 영어로 번역"), use: { "sourceRange": "C:C", "targetLanguage": "영어" }
