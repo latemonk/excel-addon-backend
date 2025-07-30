@@ -322,16 +322,27 @@ export default async function handler(req, res) {
     
     // Log all activities regardless of model (free or paid)
     let validationResult = { valid: false, company: null };
-    if (authKey && authEmail) {
-      // If auth key is provided, validate it
-      validationResult = await isValidAuthKey(authKey, authEmail, req, command, sheetContext);
-    } else {
-      // For free users without auth key, still log the activity
-      await logActivity(null, authEmail || 'Anonymous', 'Free User', req, command, sheetContext, selectedModel);
-    }
     
-    // Only gpt-4.1 (without mini or nano) requires authentication
+    // Only validate auth key for premium model
     if (selectedModel === 'gpt-4.1-2025-04-14') {
+      // Premium model requires authentication
+      if (!authKey || !authEmail) {
+        console.log('Premium model requested without auth key');
+        res.status(403).json({
+          success: false,
+          error: '프리미엄 모델을 사용하려면 유효한 인증키가 필요합니다.',
+          debug: {
+            authKeyProvided: !!authKey,
+            authEmail: authEmail,
+            model: selectedModel
+          }
+        });
+        return;
+      }
+      
+      // Validate the auth key
+      validationResult = await isValidAuthKey(authKey, authEmail, req, command, sheetContext);
+      
       if (!validationResult.valid) {
         console.log('Auth validation failed, returning 403');
         res.status(403).json({
@@ -348,6 +359,9 @@ export default async function handler(req, res) {
         return;
       }
       console.log('Auth validation passed');
+    } else {
+      // Free model - just log the activity
+      await logActivity(null, authEmail || 'Anonymous', 'Free User', req, command, sheetContext, selectedModel);
     }
 
     // Special handling for batch translation
