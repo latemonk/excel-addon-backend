@@ -366,6 +366,7 @@ For count operation, parameters should include:
 For sum operation:
 - If user mentions a column by header name (e.g., "totalToken 열의 합", "totalToken 합산"), return: { "sumType": "column", "columnName": "totalToken" }
 - If user mentions a column by letter (e.g., "D열 합계", "D column sum"), return: { "sumType": "column", "columnName": "D" }
+- If user mentions a row by number (e.g., "2행 합산", "3행 합계"), return: { "sumType": "row", "row": 2 }
 - For specific range sum, use: { "sourceRange": "A2:A10" }
 - For adding sum below selection, use: { "addNewRow": true }
 
