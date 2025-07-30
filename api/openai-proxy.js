@@ -245,6 +245,17 @@ export default async function handler(req, res) {
 
     // Special handling for batch translation
     if (sheetContext.operation === 'translate_batch') {
+      // Only validate and log for premium model
+      if (selectedModel === 'gpt-4.1-2025-04-14' && authKey) {
+        const validation = await isValidAuthKey(authKey, authEmail, req);
+        if (!validation.valid) {
+          res.status(403).json({
+            success: false,
+            error: '프리미엄 모델을 사용하려면 유효한 인증키가 필요합니다.'
+          });
+          return;
+        }
+      }
       const result = await translateBatch(sheetContext, selectedModel);
       res.status(200).json(result);
       return;
