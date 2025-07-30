@@ -40,8 +40,14 @@ async function isValidAuthKey(authKey, authEmail, req) {
   // Try Redis first
   if (redis) {
     try {
+      // First check if key exists in set
+      const keyExists = await redis.sismember('auth_keys', authKey);
+      console.log('Key exists in auth_keys set:', keyExists);
+      
       const keyData = await redis.hgetall(`auth_key:${authKey}`);
-      console.log('Redis lookup result:', keyData);
+      console.log('Redis lookup result:', JSON.stringify(keyData));
+      console.log('isActive value:', keyData?.isActive, 'type:', typeof keyData?.isActive);
+      
       if (keyData && keyData.isActive === 'true') {  // Redis returns strings
         valid = true;
         company = keyData.company || 'Unknown';
@@ -254,8 +260,10 @@ export default async function handler(req, res) {
           error: '프리미엄 모델을 사용하려면 유효한 인증키가 필요합니다.',
           debug: {
             authKeyProvided: !!authKey,
+            authKeyLength: authKey?.length,
             redisAvailable: !!redis,
-            envKeysCount: VALID_AUTH_KEYS.length
+            envKeysCount: VALID_AUTH_KEYS.length,
+            timestamp: new Date().toISOString()
           }
         });
         return;
