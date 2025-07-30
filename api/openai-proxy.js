@@ -42,7 +42,7 @@ async function isValidAuthKey(authKey, authEmail, req) {
     try {
       const keyData = await redis.hgetall(`auth_key:${authKey}`);
       console.log('Redis lookup result:', keyData);
-      if (keyData && keyData.isActive) {
+      if (keyData && keyData.isActive === 'true') {  // Redis returns strings
         valid = true;
         company = keyData.company || 'Unknown';
         
@@ -223,6 +223,15 @@ export default async function handler(req, res) {
 
   try {
     const { command, sheetContext, model, authKey, authEmail } = req.body;
+    
+    console.log('Request received:', { 
+      command, 
+      hasSheetContext: !!sheetContext, 
+      model, 
+      hasAuthKey: !!authKey,
+      authKeyLength: authKey?.length,
+      authEmail 
+    });
 
     if (!command || !sheetContext) {
       res.status(400).json({
