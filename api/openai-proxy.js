@@ -26,10 +26,7 @@ try {
 }
 
 // Valid auth keys - fallback to environment variable if KV not available
-const VALID_AUTH_KEYS = process.env.VALID_AUTH_KEYS?.split(',').map(key => key.trim()) || [
-  'DEMO12345678', // 데모용 키
-  'TEST87654321'  // 테스트용 키
-];
+const VALID_AUTH_KEYS = process.env.VALID_AUTH_KEYS?.split(',').map(key => key.trim()) || [];
 
 // Function to validate auth key and log validation
 async function isValidAuthKey(authKey, authEmail, req) {
