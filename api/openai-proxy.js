@@ -30,6 +30,8 @@ const VALID_AUTH_KEYS = process.env.VALID_AUTH_KEYS?.split(',').map(key => key.t
 
 // Function to validate auth key and log validation
 async function isValidAuthKey(authKey, authEmail, req) {
+  console.log('isValidAuthKey called with:', { authKey, authEmail, hasRedis: !!redis });
+  
   if (!authKey) return { valid: false, company: null };
   
   let company = null;
@@ -39,6 +41,7 @@ async function isValidAuthKey(authKey, authEmail, req) {
   if (redis) {
     try {
       const keyData = await redis.hgetall(`auth_key:${authKey}`);
+      console.log('Redis lookup result:', keyData);
       if (keyData && keyData.isActive) {
         valid = true;
         company = keyData.company || 'Unknown';
@@ -77,8 +80,10 @@ async function isValidAuthKey(authKey, authEmail, req) {
   if (!valid && VALID_AUTH_KEYS.length > 0) {
     valid = VALID_AUTH_KEYS.includes(authKey);
     company = 'Demo/Test';
+    console.log('Environment variable check:', { valid, VALID_AUTH_KEYS });
   }
   
+  console.log('Final validation result:', { valid, company });
   return { valid, company };
 }
 
@@ -223,15 +228,24 @@ export default async function handler(req, res) {
     
     // Validate auth key for premium model
     const selectedModel = model || 'gpt-4.1-mini-2025-04-14';
+    console.log('Model validation check:', { selectedModel, requiresAuth: selectedModel === 'gpt-4.1-2025-04-14' });
+    
     if (selectedModel === 'gpt-4.1-2025-04-14') {
       const validation = await isValidAuthKey(authKey, authEmail, req);
       if (!validation.valid) {
+        console.log('Auth validation failed, returning 403');
         res.status(403).json({
           success: false,
-          error: '프리미엄 모델을 사용하려면 유효한 인증키가 필요합니다.'
+          error: '프리미엄 모델을 사용하려면 유효한 인증키가 필요합니다.',
+          debug: {
+            authKeyProvided: !!authKey,
+            redisAvailable: !!redis,
+            envKeysCount: VALID_AUTH_KEYS.length
+          }
         });
         return;
       }
+      console.log('Auth validation passed');
     }
 
     // Special handling for batch translation
