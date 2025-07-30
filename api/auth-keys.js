@@ -1,10 +1,16 @@
 // Upstash Redis를 사용한 인증키 관리 API
+import { Redis } from '@upstash/redis';
+
 let redis = null;
+// In-memory storage fallback
+const memoryStorage = {
+  keys: new Set(),
+  data: new Map()
+};
 
 // Redis 클라이언트 초기화 시도
 try {
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-    const { Redis } = await import('@upstash/redis');
     redis = new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL,
       token: process.env.UPSTASH_REDIS_REST_TOKEN,
@@ -13,12 +19,6 @@ try {
 } catch (error) {
   console.log('Redis initialization failed, using in-memory storage:', error);
 }
-
-// In-memory storage fallback
-const memoryStorage = {
-  keys: new Set(),
-  data: new Map()
-};
 
 // 관리자 인증 확인
 function isAdmin(req) {

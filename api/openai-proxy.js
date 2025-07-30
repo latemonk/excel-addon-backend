@@ -7,11 +7,12 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',').map(origin => or
   'https://latemonk.github.io'
 ];
 
-// Import Upstash Redis if available
+// Import Upstash Redis
+import { Redis } from '@upstash/redis';
+
 let redis = null;
 try {
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-    const { Redis } = await import('@upstash/redis');
     redis = new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL,
       token: process.env.UPSTASH_REDIS_REST_TOKEN,

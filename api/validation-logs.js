@@ -1,10 +1,11 @@
 // Validation logs API for viewing auth key usage history
+import { Redis } from '@upstash/redis';
+
 let redis = null;
 
 // Redis 클라이언트 초기화 시도
 try {
   if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-    const { Redis } = await import('@upstash/redis');
     redis = new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL,
       token: process.env.UPSTASH_REDIS_REST_TOKEN,
