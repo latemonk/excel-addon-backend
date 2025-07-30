@@ -1,11 +1,24 @@
 // Upstash Redis를 사용한 인증키 관리 API
-import { Redis } from '@upstash/redis';
+let redis = null;
 
-// Redis 클라이언트 초기화
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN,
-});
+// Redis 클라이언트 초기화 시도
+try {
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    const { Redis } = await import('@upstash/redis');
+    redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
+  }
+} catch (error) {
+  console.log('Redis initialization failed, using in-memory storage:', error);
+}
+
+// In-memory storage fallback
+const memoryStorage = {
+  keys: new Set(),
+  data: new Map()
+};
 
 // 관리자 인증 확인
 function isAdmin(req) {
@@ -41,15 +54,30 @@ export default async function handler(req, res) {
     switch (req.method) {
       case 'GET':
         // 모든 인증키 조회
-        const keys = await redis.smembers('auth_keys') || [];
+        let keys = [];
         const keyDetails = [];
         
-        for (const key of keys) {
-          const details = await redis.hgetall(`auth_key:${key}`);
-          keyDetails.push({
-            key,
-            ...details
-          });
+        if (redis) {
+          keys = await redis.smembers('auth_keys') || [];
+          for (const key of keys) {
+            const details = await redis.hgetall(`auth_key:${key}`);
+            keyDetails.push({
+              key,
+              ...details
+            });
+          }
+        } else {
+          // In-memory fallback
+          keys = Array.from(memoryStorage.keys);
+          for (const key of keys) {
+            const details = memoryStorage.data.get(key);
+            if (details) {
+              keyDetails.push({
+                key,
+                ...details
+              });
+            }
+          }
         }
         
         return res.status(200).json({ 
@@ -75,9 +103,15 @@ export default async function handler(req, res) {
           usageCount: 0
         };
         
-        // Redis에 저장
-        await redis.sadd('auth_keys', newKey);
-        await redis.hset(`auth_key:${newKey}`, keyData);
+        // 저장
+        if (redis) {
+          await redis.sadd('auth_keys', newKey);
+          await redis.hset(`auth_key:${newKey}`, keyData);
+        } else {
+          // In-memory fallback
+          memoryStorage.keys.add(newKey);
+          memoryStorage.data.set(newKey, keyData);
+        }
         
         return res.status(200).json({ 
           success: true,
@@ -94,7 +128,16 @@ export default async function handler(req, res) {
         }
         
         // 완전 삭제 대신 비활성화
-        await redis.hset(`auth_key:${key}`, { isActive: false });
+        if (redis) {
+          await redis.hset(`auth_key:${key}`, { isActive: false });
+        } else {
+          // In-memory fallback
+          const keyData = memoryStorage.data.get(key);
+          if (keyData) {
+            keyData.isActive = false;
+            memoryStorage.data.set(key, keyData);
+          }
+        }
         
         return res.status(200).json({ 
           success: true,
@@ -107,8 +150,9 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Auth key management error:', error);
     return res.status(500).json({ 
-      error: 'Redis 연결 오류가 발생했습니다. Upstash Redis가 설정되었는지 확인하세요.',
-      details: error.message
+      error: '서버 오류가 발생했습니다.',
+      details: error.message,
+      storageMode: redis ? 'redis' : 'memory'
     });
   }
 }

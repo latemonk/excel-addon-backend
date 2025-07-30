@@ -8,15 +8,20 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',').map(origin => or
 ];
 
 // Import Upstash Redis if available
-let redis;
+let redis = null;
 try {
-  const { Redis } = await import('@upstash/redis');
-  redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL,
-    token: process.env.UPSTASH_REDIS_REST_TOKEN,
-  });
+  if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+    const { Redis } = await import('@upstash/redis');
+    redis = new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
+    console.log('Redis connected successfully');
+  } else {
+    console.log('Redis environment variables not found, using fallback');
+  }
 } catch (error) {
-  console.log('Upstash Redis not available, using environment variables');
+  console.log('Redis initialization failed, using environment variables:', error);
 }
 
 // Valid auth keys - fallback to environment variable if KV not available
@@ -25,19 +30,45 @@ const VALID_AUTH_KEYS = process.env.VALID_AUTH_KEYS?.split(',').map(key => key.t
   'TEST87654321'  // 테스트용 키
 ];
 
-// Function to validate auth key
-async function isValidAuthKey(authKey) {
-  if (!authKey) return false;
+// Function to validate auth key and log validation
+async function isValidAuthKey(authKey, authEmail, req) {
+  if (!authKey) return { valid: false, company: null };
+  
+  let company = null;
+  let valid = false;
   
   // Try Redis first
   if (redis) {
     try {
       const keyData = await redis.hgetall(`auth_key:${authKey}`);
       if (keyData && keyData.isActive) {
+        valid = true;
+        company = keyData.company || 'Unknown';
+        
         // 사용 횟수 증가
         await redis.hincrby(`auth_key:${authKey}`, 'usageCount', 1);
         await redis.hset(`auth_key:${authKey}`, { lastUsed: new Date().toISOString() });
-        return true;
+        
+        // 로그 저장
+        const logEntry = {
+          authKey,
+          email: authEmail || 'Not provided',
+          company,
+          timestamp: new Date().toISOString(),
+          koreanTime: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+          ip: req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection?.remoteAddress || 'Unknown',
+          userAgent: req.headers['user-agent'] || 'Unknown',
+          os: extractOS(req.headers['user-agent']),
+          browser: extractBrowser(req.headers['user-agent']),
+          origin: req.headers.origin || 'Unknown',
+          model: req.body?.model || 'Unknown'
+        };
+        
+        // Store log in Redis
+        const logKey = `log:${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        await redis.hset(logKey, logEntry);
+        await redis.sadd('validation_logs', logKey);
+        await redis.expire(logKey, 30 * 24 * 60 * 60); // Keep logs for 30 days
       }
     } catch (error) {
       console.error('Redis lookup error:', error);
@@ -45,12 +76,59 @@ async function isValidAuthKey(authKey) {
   }
   
   // Fallback to environment variable
-  if (VALID_AUTH_KEYS.length > 0) {
-    return VALID_AUTH_KEYS.includes(authKey);
+  if (!valid && VALID_AUTH_KEYS.length > 0) {
+    valid = VALID_AUTH_KEYS.includes(authKey);
+    company = 'Demo/Test';
   }
   
   // Last fallback: accept any key with 8+ characters if no keys are configured
-  return authKey.length >= 8;
+  if (!valid && authKey.length >= 8) {
+    valid = true;
+    company = 'Development';
+  }
+  
+  return { valid, company };
+}
+
+// Helper functions to extract OS and Browser info
+function extractOS(userAgent) {
+  if (!userAgent) return 'Unknown';
+  
+  const osPatterns = [
+    { pattern: /Windows NT 10.0/, name: 'Windows 10' },
+    { pattern: /Windows NT 6.3/, name: 'Windows 8.1' },
+    { pattern: /Windows NT 6.2/, name: 'Windows 8' },
+    { pattern: /Windows NT 6.1/, name: 'Windows 7' },
+    { pattern: /Mac OS X/, name: 'macOS' },
+    { pattern: /Linux/, name: 'Linux' },
+    { pattern: /iPhone/, name: 'iOS' },
+    { pattern: /iPad/, name: 'iPadOS' },
+    { pattern: /Android/, name: 'Android' }
+  ];
+  
+  for (const { pattern, name } of osPatterns) {
+    if (pattern.test(userAgent)) return name;
+  }
+  
+  return 'Unknown';
+}
+
+function extractBrowser(userAgent) {
+  if (!userAgent) return 'Unknown';
+  
+  const browserPatterns = [
+    { pattern: /Edg/, name: 'Edge' },
+    { pattern: /Chrome/, name: 'Chrome' },
+    { pattern: /Safari/, name: 'Safari' },
+    { pattern: /Firefox/, name: 'Firefox' },
+    { pattern: /Opera|OPR/, name: 'Opera' }
+  ];
+  
+  for (const { pattern, name } of browserPatterns) {
+    if (pattern.test(userAgent)) return name;
+  }
+  
+  return 'Unknown';
 }
 
 // CORS validation function
@@ -141,7 +219,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { command, sheetContext, model, authKey } = req.body;
+    const { command, sheetContext, model, authKey, authEmail } = req.body;
 
     if (!command || !sheetContext) {
       res.status(400).json({
@@ -153,12 +231,15 @@ export default async function handler(req, res) {
     
     // Validate auth key for premium model
     const selectedModel = model || 'gpt-4.1-mini-2025-04-14';
-    if (selectedModel === 'gpt-4.1-2025-04-14' && !(await isValidAuthKey(authKey))) {
-      res.status(403).json({
-        success: false,
-        error: '프리미엄 모델을 사용하려면 유효한 인증키가 필요합니다.'
-      });
-      return;
+    if (selectedModel === 'gpt-4.1-2025-04-14') {
+      const validation = await isValidAuthKey(authKey, authEmail, req);
+      if (!validation.valid) {
+        res.status(403).json({
+          success: false,
+          error: '프리미엄 모델을 사용하려면 유효한 인증키가 필요합니다.'
+        });
+        return;
+      }
     }
 
     // Special handling for batch translation
