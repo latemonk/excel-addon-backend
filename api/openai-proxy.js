@@ -29,8 +29,8 @@ try {
 const VALID_AUTH_KEYS = process.env.VALID_AUTH_KEYS?.split(',').map(key => key.trim()) || [];
 
 // Function to validate auth key and log validation
-async function isValidAuthKey(authKey, authEmail, req) {
-  console.log('isValidAuthKey called with:', { authKey, authEmail, hasRedis: !!redis });
+async function isValidAuthKey(authKey, authEmail, req, command = null, sheetContext = null) {
+  console.log('isValidAuthKey called with:', { authKey, authEmail, hasRedis: !!redis, command });
   
   if (!authKey) return { valid: false, company: null };
   
@@ -69,7 +69,10 @@ async function isValidAuthKey(authKey, authEmail, req) {
           os: extractOS(req.headers['user-agent']),
           browser: extractBrowser(req.headers['user-agent']),
           origin: req.headers.origin || 'Unknown',
-          model: req.body?.model || 'Unknown'
+          model: req.body?.model || 'Unknown',
+          command: command || req.body?.command || 'Unknown',
+          action: determineAction(command || req.body?.command, sheetContext || req.body?.sheetContext),
+          sheetOperation: sheetContext?.operation || req.body?.sheetContext?.operation || 'command'
         };
         
         // Store log in Redis
@@ -133,6 +136,48 @@ function extractBrowser(userAgent) {
   }
   
   return 'Unknown';
+}
+
+// Function to determine user action from command
+function determineAction(command, sheetContext) {
+  if (!command) return 'Unknown';
+  
+  const commandLower = command.toLowerCase();
+  
+  // Check for batch translation
+  if (sheetContext?.operation === 'translate_batch') {
+    return '대량 번역';
+  }
+  
+  // Action patterns
+  const actionPatterns = [
+    { patterns: ['번역', 'translate', '영어로', '일본어로', '중국어로', '한국어로'], action: '번역' },
+    { patterns: ['합계', '합산', 'sum', '더해', '총합'], action: '합계 계산' },
+    { patterns: ['평균', 'average', 'avg'], action: '평균 계산' },
+    { patterns: ['병합', 'merge', '합쳐'], action: '셀 병합' },
+    { patterns: ['정렬', 'sort', '오름차순', '내림차순'], action: '데이터 정렬' },
+    { patterns: ['차트', '그래프', 'chart', 'graph'], action: '차트 생성' },
+    { patterns: ['서식', 'format', '굵게', '색상', '폰트', '글자'], action: '서식 지정' },
+    { patterns: ['조건부', 'conditional'], action: '조건부 서식' },
+    { patterns: ['필터', 'filter'], action: '필터 적용' },
+    { patterns: ['삭제', 'delete', '제거', 'remove'], action: '삭제' },
+    { patterns: ['추가', 'insert', '삽입'], action: '삽입' },
+    { patterns: ['개수', 'count', '카운트', '세어'], action: '개수 계산' },
+    { patterns: ['테두리', 'border'], action: '테두리 설정' },
+    { patterns: ['빈 행', '압축', 'compress'], action: '빈 행 제거' },
+    { patterns: ['공식', 'formula', '수식'], action: '수식 입력' },
+    { patterns: ['테스트', 'test'], action: '테스트' }
+  ];
+  
+  // Check each pattern
+  for (const { patterns, action } of actionPatterns) {
+    if (patterns.some(pattern => commandLower.includes(pattern))) {
+      return action;
+    }
+  }
+  
+  // If no pattern matches, return generic action
+  return '기타 작업';
 }
 
 // CORS validation function
@@ -253,7 +298,7 @@ export default async function handler(req, res) {
     console.log('Model validation check:', { selectedModel, requiresAuth: selectedModel === 'gpt-4.1-2025-04-14' });
     
     if (selectedModel === 'gpt-4.1-2025-04-14') {
-      const validation = await isValidAuthKey(authKey, authEmail, req);
+      const validation = await isValidAuthKey(authKey, authEmail, req, command, sheetContext);
       if (!validation.valid) {
         console.log('Auth validation failed, returning 403');
         res.status(403).json({
@@ -276,7 +321,7 @@ export default async function handler(req, res) {
     if (sheetContext.operation === 'translate_batch') {
       // Only validate and log for premium model
       if (selectedModel === 'gpt-4.1-2025-04-14' && authKey) {
-        const validation = await isValidAuthKey(authKey, authEmail, req);
+        const validation = await isValidAuthKey(authKey, authEmail, req, command, sheetContext);
         if (!validation.valid) {
           res.status(403).json({
             success: false,
