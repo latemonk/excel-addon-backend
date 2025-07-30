@@ -7,6 +7,17 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',').map(origin => or
   'https://latemonk.github.io'
 ];
 
+// Valid auth keys - in production, this would be stored in a database
+const VALID_AUTH_KEYS = process.env.VALID_AUTH_KEYS?.split(',').map(key => key.trim()) || [];
+
+// Function to validate auth key
+function isValidAuthKey(authKey) {
+  if (!authKey) return false;
+  // For demo purposes, accept any key with 8+ characters
+  // In production, validate against database
+  return authKey.length >= 8;
+}
+
 // CORS validation function
 function isOriginAllowed(origin) {
   if (!origin) return false;
@@ -95,7 +106,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { command, sheetContext } = req.body;
+    const { command, sheetContext, model, authKey } = req.body;
 
     if (!command || !sheetContext) {
       res.status(400).json({
@@ -104,10 +115,20 @@ export default async function handler(req, res) {
       });
       return;
     }
+    
+    // Validate auth key for premium model
+    const selectedModel = model || 'gpt-4.1-mini-2025-04-14';
+    if (selectedModel === 'gpt-4.1-2025-04-14' && !isValidAuthKey(authKey)) {
+      res.status(403).json({
+        success: false,
+        error: '프리미엄 모델을 사용하려면 유효한 인증키가 필요합니다.'
+      });
+      return;
+    }
 
     // Special handling for batch translation
     if (sheetContext.operation === 'translate_batch') {
-      const result = await translateBatch(sheetContext);
+      const result = await translateBatch(sheetContext, selectedModel);
       res.status(200).json(result);
       return;
     }
@@ -252,7 +273,7 @@ For single operations, return:
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
+        model: selectedModel,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `User command: ${command}` }
@@ -310,7 +331,7 @@ For single operations, return:
 }
 
 // Handle batch translation
-async function translateBatch(context) {
+async function translateBatch(context, model = 'gpt-4.1-mini-2025-04-14') {
   const { texts, targetLanguage, sourceLanguage } = context;
   
   const numberedTexts = texts.map((text, index) => `[${index + 1}] ${text}`);
@@ -356,7 +377,7 @@ CRITICAL RULES:
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-2025-04-14',
+        model: model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
