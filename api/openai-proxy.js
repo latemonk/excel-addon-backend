@@ -306,9 +306,10 @@ export default async function handler(req, res) {
     }
     
     // Validate auth key for premium model
-    const selectedModel = model || 'gpt-4.1-mini-2025-04-14';
+    const selectedModel = model || 'gpt-4.1-nano-2025-04-14';
     console.log('Model validation check:', { selectedModel, requiresAuth: selectedModel === 'gpt-4.1-2025-04-14' });
     
+    // Only gpt-4.1 (without mini or nano) requires authentication
     if (selectedModel === 'gpt-4.1-2025-04-14') {
       const validation = await isValidAuthKey(authKey, authEmail, req, command, sheetContext);
       if (!validation.valid) {
@@ -552,7 +553,7 @@ For single operations, return:
 }
 
 // Handle batch translation
-async function translateBatch(context, model = 'gpt-4.1-mini-2025-04-14') {
+async function translateBatch(context, model = 'gpt-4.1-nano-2025-04-14') {
   const { texts, targetLanguage, sourceLanguage } = context;
   
   const numberedTexts = texts.map((text, index) => `[${index + 1}] ${text}`);
