@@ -48,7 +48,8 @@ async function isValidAuthKey(authKey, authEmail, req) {
       console.log('Redis lookup result:', JSON.stringify(keyData));
       console.log('isActive value:', keyData?.isActive, 'type:', typeof keyData?.isActive);
       
-      if (keyData && keyData.isActive === 'true') {  // Redis returns strings
+      // Redis can return both boolean and string, handle both cases
+      if (keyData && (keyData.isActive === true || keyData.isActive === 'true')) {
         valid = true;
         company = keyData.company || 'Unknown';
         
