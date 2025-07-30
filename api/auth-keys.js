@@ -112,7 +112,7 @@ export default async function handler(req, res) {
           memo: memo || '',
           createdAt: new Date().toISOString(),
           createdBy: 'admin',
-          isActive: true,
+          isActive: 'true',  // Redis에 문자열로 저장
           usageCount: 0
         };
         
@@ -142,12 +142,12 @@ export default async function handler(req, res) {
         
         // 완전 삭제 대신 비활성화
         if (redis) {
-          await redis.hset(`auth_key:${key}`, { isActive: false });
+          await redis.hset(`auth_key:${key}`, { isActive: 'false' });  // 문자열로 저장
         } else {
           // In-memory fallback
           const keyData = memoryStorage.data.get(key);
           if (keyData) {
-            keyData.isActive = false;
+            keyData.isActive = 'false';  // 문자열로 저장
             memoryStorage.data.set(key, keyData);
           }
         }
