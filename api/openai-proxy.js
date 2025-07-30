@@ -53,11 +53,17 @@ async function isValidAuthKey(authKey, authEmail, req, command = null, sheetCont
         valid = true;
         company = keyData.company || 'Unknown';
         
-        // 사용 횟수 증가
-        await redis.hincrby(`auth_key:${authKey}`, 'usageCount', 1);
-        await redis.hset(`auth_key:${authKey}`, { lastUsed: new Date().toISOString() });
+        // 사용 횟수 증가 (비동기로 처리하여 성능 개선)
+        // Promise를 await하지 않고 백그라운드에서 처리
+        redis.hincrby(`auth_key:${authKey}`, 'usageCount', 1).catch(err => 
+          console.error('Failed to increment usage count:', err)
+        );
         
-        // 로그 저장
+        redis.hset(`auth_key:${authKey}`, { lastUsed: new Date().toISOString() }).catch(err => 
+          console.error('Failed to update last used:', err)
+        );
+        
+        // 로그 저장 (비동기로 처리)
         const logEntry = {
           authKey,
           email: authEmail || 'Not provided',
@@ -75,11 +81,17 @@ async function isValidAuthKey(authKey, authEmail, req, command = null, sheetCont
           sheetOperation: sheetContext?.operation || req.body?.sheetContext?.operation || 'command'
         };
         
-        // Store log in Redis
+        // Store log in Redis (비동기로 처리하여 성능 개선)
         const logKey = `log:${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        await redis.hset(logKey, logEntry);
-        await redis.sadd('validation_logs', logKey);
-        await redis.expire(logKey, 30 * 24 * 60 * 60); // Keep logs for 30 days
+        
+        // 로그 저장을 백그라운드에서 처리
+        Promise.all([
+          redis.hset(logKey, logEntry),
+          redis.sadd('validation_logs', logKey),
+          redis.expire(logKey, 30 * 24 * 60 * 60) // Keep logs for 30 days
+        ]).catch(err => {
+          console.error('Failed to save log:', err);
+        });
       }
     } catch (error) {
       console.error('Redis lookup error:', error);
