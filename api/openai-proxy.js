@@ -63,35 +63,8 @@ async function isValidAuthKey(authKey, authEmail, req, command = null, sheetCont
           console.error('Failed to update last used:', err)
         );
         
-        // 로그 저장 (비동기로 처리)
-        const logEntry = {
-          authKey,
-          email: authEmail || 'Not provided',
-          company,
-          timestamp: new Date().toISOString(),
-          koreanTime: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
-          ip: req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection?.remoteAddress || 'Unknown',
-          userAgent: req.headers['user-agent'] || 'Unknown',
-          os: extractOS(req.headers['user-agent']),
-          browser: extractBrowser(req.headers['user-agent']),
-          origin: req.headers.origin || 'Unknown',
-          model: req.body?.model || 'Unknown',
-          command: command || req.body?.command || 'Unknown',
-          action: determineAction(command || req.body?.command, sheetContext || req.body?.sheetContext),
-          sheetOperation: sheetContext?.operation || req.body?.sheetContext?.operation || 'command'
-        };
-        
-        // Store log in Redis (비동기로 처리하여 성능 개선)
-        const logKey = `log:${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
-        // 로그 저장을 백그라운드에서 처리
-        Promise.all([
-          redis.hset(logKey, logEntry),
-          redis.sadd('validation_logs', logKey),
-          redis.expire(logKey, 30 * 24 * 60 * 60) // Keep logs for 30 days
-        ]).catch(err => {
-          console.error('Failed to save log:', err);
-        });
+        // Log the activity separately
+        await logActivity(authKey, authEmail, company, req, command, sheetContext, req.body?.model);
       }
     } catch (error) {
       console.error('Redis lookup error:', error);
@@ -190,6 +163,44 @@ function determineAction(command, sheetContext) {
   
   // If no pattern matches, return generic action
   return '기타 작업';
+}
+
+// Function to log activity (separated from auth validation)
+async function logActivity(authKey, authEmail, company, req, command, sheetContext, model) {
+  if (!redis) return;
+  
+  try {
+    const logEntry = {
+      authKey: authKey || 'Free',
+      email: authEmail || 'Anonymous',
+      company: company || 'Free User',
+      timestamp: new Date().toISOString(),
+      koreanTime: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+      ip: req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection?.remoteAddress || 'Unknown',
+      userAgent: req.headers['user-agent'] || 'Unknown',
+      os: extractOS(req.headers['user-agent']),
+      browser: extractBrowser(req.headers['user-agent']),
+      origin: req.headers.origin || 'Unknown',
+      model: model || 'Unknown',
+      command: command || 'Unknown',
+      action: determineAction(command, sheetContext),
+      sheetOperation: sheetContext?.operation || 'command',
+      isFreeUser: !authKey || authKey === 'Free'
+    };
+    
+    // Store log in Redis
+    const logKey = `log:${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    await Promise.all([
+      redis.hset(logKey, logEntry),
+      redis.sadd('validation_logs', logKey),
+      redis.expire(logKey, 30 * 24 * 60 * 60) // Keep logs for 30 days
+    ]).catch(err => {
+      console.error('Failed to save log:', err);
+    });
+  } catch (error) {
+    console.error('Error logging activity:', error);
+  }
 }
 
 // CORS validation function
@@ -309,10 +320,19 @@ export default async function handler(req, res) {
     const selectedModel = model || 'gpt-4.1-nano-2025-04-14';
     console.log('Model validation check:', { selectedModel, requiresAuth: selectedModel === 'gpt-4.1-2025-04-14' });
     
+    // Log all activities regardless of model (free or paid)
+    let validationResult = { valid: false, company: null };
+    if (authKey && authEmail) {
+      // If auth key is provided, validate it
+      validationResult = await isValidAuthKey(authKey, authEmail, req, command, sheetContext);
+    } else {
+      // For free users without auth key, still log the activity
+      await logActivity(null, authEmail || 'Anonymous', 'Free User', req, command, sheetContext, selectedModel);
+    }
+    
     // Only gpt-4.1 (without mini or nano) requires authentication
     if (selectedModel === 'gpt-4.1-2025-04-14') {
-      const validation = await isValidAuthKey(authKey, authEmail, req, command, sheetContext);
-      if (!validation.valid) {
+      if (!validationResult.valid) {
         console.log('Auth validation failed, returning 403');
         res.status(403).json({
           success: false,
@@ -332,17 +352,21 @@ export default async function handler(req, res) {
 
     // Special handling for batch translation
     if (sheetContext.operation === 'translate_batch') {
-      // Only validate and log for premium model
-      if (selectedModel === 'gpt-4.1-2025-04-14' && authKey) {
-        const validation = await isValidAuthKey(authKey, authEmail, req, command, sheetContext);
-        if (!validation.valid) {
-          res.status(403).json({
-            success: false,
-            error: '프리미엄 모델을 사용하려면 유효한 인증키가 필요합니다.'
-          });
-          return;
-        }
+      // Log activity for batch translation (both free and paid)
+      if (!authKey || !authEmail) {
+        // Free user
+        await logActivity(null, authEmail || 'Anonymous', 'Free User', req, command, sheetContext, selectedModel);
       }
+      
+      // Only validate for premium model
+      if (selectedModel === 'gpt-4.1-2025-04-14' && !validationResult.valid) {
+        res.status(403).json({
+          success: false,
+          error: '프리미엄 모델을 사용하려면 유효한 인증키가 필요합니다.'
+        });
+        return;
+      }
+      
       const result = await translateBatch(sheetContext, selectedModel);
       res.status(200).json(result);
       return;

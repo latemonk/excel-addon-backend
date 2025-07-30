@@ -58,7 +58,21 @@ export default async function handler(req, res) {
     const stats = {
       companies: {},
       totalUniqueUsers: 0,
-      currentMonth: new Date().toISOString().substring(0, 7) // YYYY-MM
+      totalFreeUsers: 0,
+      totalPaidUsers: 0,
+      currentMonth: new Date().toISOString().substring(0, 7), // YYYY-MM
+      breakdown: {
+        free: {
+          totalUsers: 0,
+          currentMonthUsers: 0,
+          monthlyActiveUsers: {}
+        },
+        paid: {
+          totalUsers: 0,
+          currentMonthUsers: 0,
+          monthlyActiveUsers: {}
+        }
+      }
     };
     
     if (redis) {
@@ -67,6 +81,10 @@ export default async function handler(req, res) {
       
       // Process logs to extract unique users per company per month
       const companyMonthlyUsers = {};
+      const freeUsersByMonth = {};
+      const paidUsersByMonth = {};
+      const allFreeUsers = new Set();
+      const allPaidUsers = new Set();
       
       for (const logKey of logKeys) {
         const logData = await redis.hgetall(logKey);
@@ -74,6 +92,8 @@ export default async function handler(req, res) {
           const month = logData.timestamp.substring(0, 7); // YYYY-MM
           const email = logData.email.toLowerCase();
           const company = logData.company;
+          const isFreeUser = logData.isFreeUser === 'true' || logData.isFreeUser === true || 
+                             logData.authKey === 'Free' || company === 'Free User';
           
           // Initialize company data if not exists
           if (!companyMonthlyUsers[company]) {
@@ -87,15 +107,32 @@ export default async function handler(req, res) {
           
           // Add unique user
           companyMonthlyUsers[company][month].add(email);
+          
+          // Track free vs paid users
+          if (isFreeUser) {
+            allFreeUsers.add(email);
+            if (!freeUsersByMonth[month]) {
+              freeUsersByMonth[month] = new Set();
+            }
+            freeUsersByMonth[month].add(email);
+          } else {
+            allPaidUsers.add(email);
+            if (!paidUsersByMonth[month]) {
+              paidUsersByMonth[month] = new Set();
+            }
+            paidUsersByMonth[month].add(email);
+          }
         }
       }
       
       // Convert Sets to counts
       for (const [company, monthlyData] of Object.entries(companyMonthlyUsers)) {
+        const isFreeCompany = company === 'Free User';
         stats.companies[company] = {
           monthlyActiveUsers: {},
           totalUniqueUsers: new Set(),
-          currentMonthUsers: 0
+          currentMonthUsers: 0,
+          isFree: isFreeCompany
         };
         
         for (const [month, userSet] of Object.entries(monthlyData)) {
@@ -114,6 +151,27 @@ export default async function handler(req, res) {
         const totalCount = stats.companies[company].totalUniqueUsers.size;
         stats.companies[company].totalUniqueUsers = totalCount;
         stats.totalUniqueUsers += totalCount;
+      }
+      
+      // Process free/paid user breakdown
+      stats.totalFreeUsers = allFreeUsers.size;
+      stats.totalPaidUsers = allPaidUsers.size;
+      stats.breakdown.free.totalUsers = allFreeUsers.size;
+      stats.breakdown.paid.totalUsers = allPaidUsers.size;
+      
+      // Convert monthly free/paid users to counts
+      for (const [month, userSet] of Object.entries(freeUsersByMonth)) {
+        stats.breakdown.free.monthlyActiveUsers[month] = userSet.size;
+        if (month === stats.currentMonth) {
+          stats.breakdown.free.currentMonthUsers = userSet.size;
+        }
+      }
+      
+      for (const [month, userSet] of Object.entries(paidUsersByMonth)) {
+        stats.breakdown.paid.monthlyActiveUsers[month] = userSet.size;
+        if (month === stats.currentMonth) {
+          stats.breakdown.paid.currentMonthUsers = userSet.size;
+        }
       }
       
       // Get auth keys for additional company info
