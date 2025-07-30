@@ -82,12 +82,6 @@ async function isValidAuthKey(authKey, authEmail, req) {
     company = 'Demo/Test';
   }
   
-  // Last fallback: accept any key with 8+ characters if no keys are configured
-  if (!valid && authKey.length >= 8) {
-    valid = true;
-    company = 'Development';
-  }
-  
   return { valid, company };
 }
 
