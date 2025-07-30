@@ -420,6 +420,12 @@ For translate operation:
 - Languages: 영어 (English), 한국어 (Korean), 일본어 (Japanese), 중국어 (Chinese), etc.
 - Example: { "sourceRange": "B2:B40", "targetRange": "E:E", "targetLanguage": "일본어" }
 
+For delete operation:
+- If user mentions deleting a column by letter (e.g., "C열 삭제", "D column delete"), return: { "deleteType": "column", "column": "C" }
+- If user mentions deleting a row by number (e.g., "3행 삭제", "5행 제거"), return: { "deleteType": "row", "row": 3 }
+- If user mentions deleting multiple columns (e.g., "C-E열 삭제"), return: { "deleteType": "columns", "startColumn": "C", "endColumn": "E" }
+- If user mentions deleting multiple rows (e.g., "3-5행 삭제"), return: { "deleteType": "rows", "startRow": 3, "endRow": 5 }
+
 For compress operation:
 - If user mentions removing empty rows in a range (e.g., "D2:D170 사이의 빈 행 제거"), use: { "range": "D2:D170" }
 - This removes entire rows where the specified column cells are empty
