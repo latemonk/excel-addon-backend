@@ -7,14 +7,49 @@ const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS?.split(',').map(origin => or
   'https://latemonk.github.io'
 ];
 
-// Valid auth keys - in production, this would be stored in a database
-const VALID_AUTH_KEYS = process.env.VALID_AUTH_KEYS?.split(',').map(key => key.trim()) || [];
+// Import Upstash Redis if available
+let redis;
+try {
+  const { Redis } = await import('@upstash/redis');
+  redis = new Redis({
+    url: process.env.UPSTASH_REDIS_REST_URL,
+    token: process.env.UPSTASH_REDIS_REST_TOKEN,
+  });
+} catch (error) {
+  console.log('Upstash Redis not available, using environment variables');
+}
+
+// Valid auth keys - fallback to environment variable if KV not available
+const VALID_AUTH_KEYS = process.env.VALID_AUTH_KEYS?.split(',').map(key => key.trim()) || [
+  'DEMO12345678', // 데모용 키
+  'TEST87654321'  // 테스트용 키
+];
 
 // Function to validate auth key
-function isValidAuthKey(authKey) {
+async function isValidAuthKey(authKey) {
   if (!authKey) return false;
-  // For demo purposes, accept any key with 8+ characters
-  // In production, validate against database
+  
+  // Try Redis first
+  if (redis) {
+    try {
+      const keyData = await redis.hgetall(`auth_key:${authKey}`);
+      if (keyData && keyData.isActive) {
+        // 사용 횟수 증가
+        await redis.hincrby(`auth_key:${authKey}`, 'usageCount', 1);
+        await redis.hset(`auth_key:${authKey}`, { lastUsed: new Date().toISOString() });
+        return true;
+      }
+    } catch (error) {
+      console.error('Redis lookup error:', error);
+    }
+  }
+  
+  // Fallback to environment variable
+  if (VALID_AUTH_KEYS.length > 0) {
+    return VALID_AUTH_KEYS.includes(authKey);
+  }
+  
+  // Last fallback: accept any key with 8+ characters if no keys are configured
   return authKey.length >= 8;
 }
 
@@ -118,7 +153,7 @@ export default async function handler(req, res) {
     
     // Validate auth key for premium model
     const selectedModel = model || 'gpt-4.1-mini-2025-04-14';
-    if (selectedModel === 'gpt-4.1-2025-04-14' && !isValidAuthKey(authKey)) {
+    if (selectedModel === 'gpt-4.1-2025-04-14' && !(await isValidAuthKey(authKey))) {
       res.status(403).json({
         success: false,
         error: '프리미엄 모델을 사용하려면 유효한 인증키가 필요합니다.'
