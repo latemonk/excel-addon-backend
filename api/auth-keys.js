@@ -28,10 +28,14 @@ function isAdmin(req) {
 
 // 랜덤 키 생성
 function generateAuthKey() {
-  const prefix = 'WORKS';
-  const timestamp = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).substr(2, 6).toUpperCase();
-  return `${prefix}-${timestamp}-${random}`;
+  const prefix = 'WRKS';
+  // 8자리 랜덤 문자열 생성 (대문자 + 숫자)
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let randomPart = '';
+  for (let i = 0; i < 8; i++) {
+    randomPart += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return `${prefix}-${randomPart}`;
 }
 
 export default async function handler(req, res) {
