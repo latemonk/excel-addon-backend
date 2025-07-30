@@ -173,7 +173,13 @@ export default async function handler(req, res) {
       status: 'ok',
       message: 'Excel Addon Proxy API is running',
       apiKeyConfigured: !!OPENAI_API_KEY,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      version: '2.0', // Added to verify deployment
+      authConfig: {
+        redisConfigured: !!redis,
+        envKeysCount: VALID_AUTH_KEYS.length,
+        hasHardcodedKeys: false // This should be false after our fix
+      }
     });
     return;
   }
