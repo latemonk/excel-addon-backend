@@ -63,8 +63,10 @@ async function isValidAuthKey(authKey, authEmail, req, command = null, sheetCont
           console.error('Failed to update last used:', err)
         );
         
-        // Log the activity separately
-        await logActivity(authKey, authEmail, company, req, command, sheetContext, req.body?.model);
+        // Log the activity separately (async without await for performance)
+        logActivity(authKey, authEmail, company, req, command, sheetContext, req.body?.model).catch(err => 
+          console.error('Failed to log activity:', err)
+        );
       }
     } catch (error) {
       console.error('Redis lookup error:', error);
@@ -165,42 +167,52 @@ function determineAction(command, sheetContext) {
   return '기타 작업';
 }
 
-// Function to log activity (separated from auth validation)
-async function logActivity(authKey, authEmail, company, req, command, sheetContext, model) {
-  if (!redis) return;
+// Function to log activity (fully async for performance)
+function logActivity(authKey, authEmail, company, req, command, sheetContext, model) {
+  if (!redis) return Promise.resolve();
   
-  try {
-    const logEntry = {
-      authKey: authKey || 'Free',
-      email: authEmail || 'Anonymous',
-      company: company || 'Free User',
-      timestamp: new Date().toISOString(),
-      koreanTime: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
-      ip: req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection?.remoteAddress || 'Unknown',
-      userAgent: req.headers['user-agent'] || 'Unknown',
-      os: extractOS(req.headers['user-agent']),
-      browser: extractBrowser(req.headers['user-agent']),
-      origin: req.headers.origin || 'Unknown',
-      model: model || 'Unknown',
-      command: command || 'Unknown',
-      action: determineAction(command, sheetContext),
-      sheetOperation: sheetContext?.operation || 'command',
-      isFreeUser: !authKey || authKey === 'Free'
-    };
+  // Return immediately and process in background
+  return new Promise((resolve) => {
+    // Resolve immediately to not block the main request
+    resolve();
     
-    // Store log in Redis
-    const logKey = `log:${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
-    await Promise.all([
-      redis.hset(logKey, logEntry),
-      redis.sadd('validation_logs', logKey),
-      redis.expire(logKey, 30 * 24 * 60 * 60) // Keep logs for 30 days
-    ]).catch(err => {
-      console.error('Failed to save log:', err);
+    // Process logging in background
+    setImmediate(() => {
+      try {
+        const logEntry = {
+          authKey: authKey || 'Free',
+          email: authEmail || 'Anonymous',
+          company: company || 'Free User',
+          timestamp: new Date().toISOString(),
+          koreanTime: new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
+          ip: req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.connection?.remoteAddress || 'Unknown',
+          userAgent: req.headers['user-agent'] || 'Unknown',
+          os: extractOS(req.headers['user-agent']),
+          browser: extractBrowser(req.headers['user-agent']),
+          origin: req.headers.origin || 'Unknown',
+          model: model || 'Unknown',
+          command: command || 'Unknown',
+          action: determineAction(command, sheetContext),
+          sheetOperation: sheetContext?.operation || 'command',
+          isFreeUser: !authKey || authKey === 'Free'
+        };
+        
+        // Store log in Redis
+        const logKey = `log:${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Fire and forget - don't await
+        Promise.all([
+          redis.hset(logKey, logEntry),
+          redis.sadd('validation_logs', logKey),
+          redis.expire(logKey, 30 * 24 * 60 * 60) // Keep logs for 30 days
+        ]).catch(err => {
+          console.error('Failed to save log:', err);
+        });
+      } catch (error) {
+        console.error('Error logging activity:', error);
+      }
     });
-  } catch (error) {
-    console.error('Error logging activity:', error);
-  }
+  });
 }
 
 // CORS validation function
@@ -360,16 +372,20 @@ export default async function handler(req, res) {
       }
       console.log('Auth validation passed');
     } else {
-      // Free model - just log the activity
-      await logActivity(null, authEmail || 'Anonymous', 'Free User', req, command, sheetContext, selectedModel);
+      // Free model - just log the activity (async without await for performance)
+      logActivity(null, authEmail || 'Anonymous', 'Free User', req, command, sheetContext, selectedModel).catch(err => 
+        console.error('Failed to log free user activity:', err)
+      );
     }
 
     // Special handling for batch translation
     if (sheetContext.operation === 'translate_batch') {
-      // Log activity for batch translation (both free and paid)
+      // Log activity for batch translation (both free and paid) - async without await
       if (!authKey || !authEmail) {
         // Free user
-        await logActivity(null, authEmail || 'Anonymous', 'Free User', req, command, sheetContext, selectedModel);
+        logActivity(null, authEmail || 'Anonymous', 'Free User', req, command, sheetContext, selectedModel).catch(err => 
+          console.error('Failed to log batch translation activity:', err)
+        );
       }
       
       // Only validate for premium model
