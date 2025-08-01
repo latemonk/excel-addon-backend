@@ -603,8 +603,10 @@ For single operations, return:
     
     if (data.choices && data.choices[0]) {
       const content = data.choices[0].message.content;
+      console.log('AI response content:', content);
       try {
         const parsedCommand = JSON.parse(content);
+        console.log('Parsed command:', JSON.stringify(parsedCommand));
         res.status(200).json({
           success: true,
           data: parsedCommand
