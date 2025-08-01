@@ -428,6 +428,20 @@ export default async function handler(req, res) {
     const platform = isGoogleSheets ? 'Google Sheets' : 'Excel';
     
     const systemPrompt = `You are ${isGoogleSheets ? 'a Google Sheets' : 'an Excel'} assistant that interprets natural language commands and returns JSON instructions for ${platform} operations.
+
+${isGoogleSheets ? 
+`IMPORTANT: Always return a JSON object with two fields:
+1. "operation": the operation name (e.g., "sum", "format", "merge")
+2. "parameters": an object containing the parameters for that operation
+
+Example response format:
+{
+  "operation": "sum",
+  "parameters": {
+    "sumType": "column",
+    "columnName": "A"
+  }
+}` : ''}
     
 Available operations:
 1. merge: Merge cells
@@ -455,11 +469,11 @@ For count operation, parameters should include:
 - "operator": "contains", "equals", ">", "<", etc.
 
 For sum operation:
-- If user mentions a column by header name (e.g., "totalToken 열의 합", "totalToken 합산"), return: { "sumType": "column", "columnName": "totalToken" }
-- If user mentions a column by letter (e.g., "D열 합계", "D column sum"), return: { "sumType": "column", "columnName": "D" }
-- If user mentions a row by number (e.g., "2행 합산", "3행 합계"), return: { "sumType": "row", "row": 2 }
-- For specific range sum, use: { "sourceRange": "A2:A10" }
-- For adding sum below selection, use: { "addNewRow": true }
+- If user mentions a column by header name (e.g., "totalToken 열의 합", "totalToken 합산"), return: ${isGoogleSheets ? '{ "operation": "sum", "parameters": { "sumType": "column", "columnName": "totalToken" } }' : '{ "sumType": "column", "columnName": "totalToken" }'}
+- If user mentions a column by letter (e.g., "D열 합계", "D column sum"), return: ${isGoogleSheets ? '{ "operation": "sum", "parameters": { "sumType": "column", "columnName": "D" } }' : '{ "sumType": "column", "columnName": "D" }'}
+- If user mentions a row by number (e.g., "2행 합산", "3행 합계"), return: ${isGoogleSheets ? '{ "operation": "sum", "parameters": { "sumType": "row", "row": 2 } }' : '{ "sumType": "row", "row": 2 }'}
+- For specific range sum, use: ${isGoogleSheets ? '{ "operation": "sum", "parameters": { "sourceRange": "A2:A10" } }' : '{ "sourceRange": "A2:A10" }'}
+- For adding sum below selection, use: ${isGoogleSheets ? '{ "operation": "sum", "parameters": { "addNewRow": true } }' : '{ "addNewRow": true }'}
 
 For average operation:
 - If user mentions column average (e.g., "C열 평균"), return: { "averageType": "column", "column": "C" }
@@ -469,11 +483,11 @@ For average operation:
 - Default behavior without specific range uses selected cells
 
 For format operation:
-- If user mentions number format (e.g., "숫자 형식", "숫자로"), return: { "numberFormat": "number" }
-- If user mentions currency/won format (e.g., "원화 형식", "통화 형식"), return: { "numberFormat": "currency" }
-- For specific cells like "E101", use: { "range": "E101" }
-- If user mentions text color (e.g., "파란색으로", "빨간색 글자"), use: { "fontColor": "#0000FF" } (not backgroundColor)
-- If user mentions background/cell color (e.g., "배경색", "셀 색상"), use: { "backgroundColor": "#color" }
+- If user mentions number format (e.g., "숫자 형식", "숫자로"), return: ${isGoogleSheets ? '{ "operation": "format", "parameters": { "numberFormat": "number" } }' : '{ "numberFormat": "number" }'}
+- If user mentions currency/won format (e.g., "원화 형식", "통화 형식"), return: ${isGoogleSheets ? '{ "operation": "format", "parameters": { "numberFormat": "currency" } }' : '{ "numberFormat": "currency" }'}
+- For specific cells like "E101", use: ${isGoogleSheets ? '{ "operation": "format", "parameters": { "range": "E101" } }' : '{ "range": "E101" }'}
+- If user mentions text color (e.g., "파란색으로", "빨간색 글자"), use: ${isGoogleSheets ? '{ "operation": "format", "parameters": { "fontColor": "#0000FF" } }' : '{ "fontColor": "#0000FF" }'} (not backgroundColor)
+- If user mentions background/cell color (e.g., "배경색", "셀 색상"), use: ${isGoogleSheets ? '{ "operation": "format", "parameters": { "backgroundColor": "#color" } }' : '{ "backgroundColor": "#color" }'}
 - Other format options: bold (굵게), italic (기울임), fontSize (글자 크기)
 - Common colors: 파란색=#0000FF, 빨간색=#FF0000, 초록색=#00FF00, 노란색=#FFFF00, 검정색=#000000
 
