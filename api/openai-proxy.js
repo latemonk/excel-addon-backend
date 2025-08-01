@@ -329,7 +329,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { command, sheetContext, model, authKey, authEmail } = req.body;
+    const { command, sheetContext, model, authKey, authEmail, clientType } = req.body;
     
     console.log('Request received:', { 
       command, 
@@ -337,7 +337,8 @@ export default async function handler(req, res) {
       model, 
       hasAuthKey: !!authKey,
       authKeyLength: authKey?.length,
-      authEmail 
+      authEmail,
+      clientType: clientType || 'excel' // Default to excel for backward compatibility
     });
 
     if (!command || !sheetContext) {
@@ -423,7 +424,10 @@ export default async function handler(req, res) {
     }
 
     // Regular command processing
-    const systemPrompt = `You are an Excel assistant that interprets natural language commands and returns JSON instructions for Excel operations.
+    const isGoogleSheets = clientType === 'google-sheets';
+    const platform = isGoogleSheets ? 'Google Sheets' : 'Excel';
+    
+    const systemPrompt = `You are ${isGoogleSheets ? 'a Google Sheets' : 'an Excel'} assistant that interprets natural language commands and returns JSON instructions for ${platform} operations.
     
 Available operations:
 1. merge: Merge cells
@@ -535,7 +539,7 @@ For border_format operation:
 - If user says "선택한" or row/range is mentioned, don't include range parameter (uses selected range)
 
 Current sheet context:
-- Active range: ${sheetContext.activeRange?.address}
+- Active range: ${isGoogleSheets ? (sheetContext.activeRange?.a1Notation || 'None') : (sheetContext.activeRange?.address || 'None')}
 - Sheet dimensions: ${sheetContext.lastRow} rows x ${sheetContext.lastColumn} columns
 - Headers: ${sheetContext.headers?.map(h => `Column ${h.columnLetter}: "${h.label}"`).join(', ')}
 
