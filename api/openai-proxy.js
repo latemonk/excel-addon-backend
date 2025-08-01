@@ -216,7 +216,13 @@ function logActivity(authKey, authEmail, company, req, command, sheetContext, mo
 }
 
 // CORS validation function
-function isOriginAllowed(origin) {
+function isOriginAllowed(origin, headers) {
+  // Google Apps Script doesn't send origin header but sends specific User-Agent
+  if (!origin && headers && headers['user-agent'] === 'Google-Apps-Script') {
+    console.log('Allowing Google Apps Script request');
+    return true;
+  }
+  
   if (!origin) return false;
   
   // Check exact matches
@@ -244,8 +250,8 @@ export default async function handler(req, res) {
   
   // Handle OPTIONS request first (preflight)
   if (req.method === 'OPTIONS') {
-    if (isOriginAllowed(origin)) {
-      res.setHeader('Access-Control-Allow-Origin', origin);
+    if (isOriginAllowed(origin, req.headers)) {
+      res.setHeader('Access-Control-Allow-Origin', origin || '*');
       res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
       res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
@@ -276,16 +282,18 @@ export default async function handler(req, res) {
   console.log('Request origin:', origin);
   console.log('User-Agent:', req.headers['user-agent']);
   
-  if (isOriginAllowed(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
+  if (isOriginAllowed(origin, req.headers)) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   } else {
     console.log('Origin not allowed:', origin);
+    console.log('User-Agent:', req.headers['user-agent']);
     console.log('Allowed origins:', ALLOWED_ORIGINS);
     res.status(403).json({ 
       error: 'Origin not allowed',
       origin: origin,
+      userAgent: req.headers['user-agent'],
       allowedOrigins: ALLOWED_ORIGINS,
       headers: req.headers
     });
