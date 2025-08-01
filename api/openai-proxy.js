@@ -217,10 +217,20 @@ function logActivity(authKey, authEmail, company, req, command, sheetContext, mo
 
 // CORS validation function
 function isOriginAllowed(origin, headers) {
-  // Google Apps Script doesn't send origin header but sends specific User-Agent
-  if (!origin && headers && headers['user-agent'] === 'Google-Apps-Script') {
-    console.log('Allowing Google Apps Script request');
-    return true;
+  // Google Apps Script doesn't send origin header
+  // Check for Google Apps Script specific headers
+  if (!origin && headers) {
+    // Check multiple possible indicators of Google Apps Script
+    const userAgent = headers['user-agent'] || '';
+    const xRequestedWith = headers['x-requested-with'] || '';
+    
+    if (userAgent === 'Google-Apps-Script' || 
+        xRequestedWith === 'XMLHttpRequest' ||
+        userAgent.includes('Google') ||
+        userAgent.includes('Apps-Script')) {
+      console.log('Allowing Google Apps Script request - User-Agent:', userAgent, 'X-Requested-With:', xRequestedWith);
+      return true;
+    }
   }
   
   if (!origin) return false;
@@ -231,17 +241,19 @@ function isOriginAllowed(origin, headers) {
   // Check wildcard
   if (ALLOWED_ORIGINS.includes('*')) return true;
   
-  // Check patterns (e.g., for Office domains)
-  const officePatterns = [
+  // Check patterns (e.g., for Office domains and Google domains)
+  const patterns = [
     /^https:\/\/.*\.office\.com$/,
     /^https:\/\/.*\.office365\.com$/,
     /^https:\/\/.*\.microsoft\.com$/,
     /^https:\/\/.*\.officeapps\.live\.com$/,
     /^https:\/\/.*\.sharepoint\.com$/,
+    /^https:\/\/.*\.google\.com$/,
+    /^https:\/\/script\.google\.com$/,
     /^https:\/\/localhost:\d+$/
   ];
   
-  return officePatterns.some(pattern => pattern.test(origin));
+  return patterns.some(pattern => pattern.test(origin));
 }
 
 export default async function handler(req, res) {
